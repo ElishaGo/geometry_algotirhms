@@ -1,3 +1,7 @@
+"""
+Implementation of Delaunay triangulation algorithm
+Outputs file with number of edge flips performed during triangulation
+"""
 from GeometryObjects import Point, Edge, Triangle
 
 global EDGE_FLIP_COUNTER
@@ -36,7 +40,42 @@ def get_data_from_file(fpath):
     return points_list, triangle_list
 
 
-def is_legal_edge():
+def get_min_angle_in_triangle(t, level=1):
+    alpha, betta, gamma = t.get_angles()
+    if level == 1:
+        return min(alpha, betta, gamma)
+    elif level == 2:
+        first_min = min(alpha, betta, gamma)
+        return min([alpha, betta, gamma].remove(first_min))
+    else:
+        return max(alpha, betta, gamma)
+
+
+def is_legal_edge(t, adj_t, e):
+    """An edge is illegal if flipping it would increase the angle vector of the adjacent triangles"""
+    min_angle1 = get_min_angle_in_triangle(t)
+    min_angle2 = get_min_angle_in_triangle(adj_t)
+
+    flipped_t, flipped_adj_t = flip_edges(t, adj_t, e, count=False)
+    min_angle_flipped1 = get_min_angle_in_triangle(flipped_t)
+    min_angle_flipped2 = get_min_angle_in_triangle(flipped_adj_t)
+
+    if min_angle_flipped1 > min_angle1:
+        return False
+    elif min_angle_flipped1 == min_angle1:
+        min_angle_flipped1 = get_min_angle_in_triangle(flipped_t, level=2)
+        min_angle_flipped2 = get_min_angle_in_triangle(flipped_adj_t, level=2)
+        if min_angle_flipped1 > min_angle1:
+            return False
+        elif min_angle_flipped1 == min_angle1:
+            min_angle_flipped1 = get_min_angle_in_triangle(flipped_t, level=3)
+            min_angle_flipped2 = get_min_angle_in_triangle(flipped_adj_t, level=3)
+            if min_angle_flipped1 > min_angle1:
+                return False
+            else:
+                return True
+    else:
+        return True
 
 
 def get_init_triangle(graph_points: list):
@@ -68,20 +107,21 @@ def insert(p: Point, all_triangles: list):
     :param t: list of triangles
     :return:
     """
-    # find triangle containing p
+    # add edge from p to the other triangle points
+    for t in all_triangles:
+        e1, e2, e3 = t.get_edges()
 
-    # add edge from p to the other trianle points
-
-    # legelize edge1
-
-    # legelize edge1
-
-    # legelize edge1
+        # legalize edges
+        legalize_edge(p, e1, all_triangles)
+        legalize_edge(p, e2, all_triangles)
+        legalize_edge(p, e3, all_triangles)
 
 
-def flip_edges(t1: Triangle, t2: Triangle, e: Edge):
+def flip_edges(t1: Triangle, t2: Triangle, e: Edge, count: bool = True):
     """
-    flip edges by creating two new triangles from the same outer edges of the two first triangles
+    flip edges by creating two new triangles from the same outer edges of the two first triangles.
+    flip is counted in global variable for the output.
+    If flip is only to check if flip is legal, don't count the flip.
     :param t1: old triangele
     :param t2: old triangle
     :param e: illegal edge
@@ -107,8 +147,33 @@ def flip_edges(t1: Triangle, t2: Triangle, e: Edge):
         new_t1 = Triangle(edges1[0], edges2[1], new_edge1)
         new_t2 = Triangle(edges1[1], edges2[0], new_edge1)
 
-    EDGE_FLIP_COUNTER += 1
+    # if flip is applied in algorithm
+    if count:
+        EDGE_FLIP_COUNTER += 1
+
     return new_t1, new_t2
+
+
+def legalize_edge(p: Point, e: Edge, all_triangles: list):
+    """
+    if edge is illegal, flip edges and check new if new edges are legal recursively
+    :param p: new point
+    :param e: edge to check if legal
+    :param all_triangles: to find adjacent triangle
+    :return: if edge is legal (in recursion)
+    """
+    p1, p2 = e.get_points_id()
+
+    # get triangle and adjacent triangle
+    t = Triangle(Edge(p, p1), Edge(p, p2), e)
+    adj_t = get_adjacent_triangle(p, e, all_triangles)
+
+    if is_legal_edge(t, adj_t, e):
+        return
+    else:
+        new_t1, new_t2 = flip_edges(t, adj_t, e)
+        legalize_edge(p, new_t1.get_opposite_edge(p), all_triangles)
+        legalize_edge(p, new_t2.get_opposite_edge(p), all_triangles)
 
 
 def get_adjacent_triangle(p: Point, e: Edge, all_triangles: list):
@@ -125,32 +190,23 @@ def get_adjacent_triangle(p: Point, e: Edge, all_triangles: list):
                 return t
 
 
-def legalize_edge(p: Point, e: Edge, all_triangles: list):
-    """
-    if edge is illegal, flip edges and check new if new edges are legal recursively
-    :param p: new point
-    :param e: edge to check if ligal
-    :param all_triangles: to find adjacent triangle
-    :return: if edge is legal (in recursion)
-    """
-    p1, p2 = e.get_points_id()
+def run_delaunay_triangulation(triangle_list):
+    """run over all points from input, and use the Delaunay algorithm to insert a new point while using legal triangulation"""
+    # create the initial triangle and add to traingle list
+    after_traingulation_points = []
+    init_triangle = get_init_triangle(triangle_list)
+    after_traingulation_points.append(init_triangle)
 
-    if is_legal_edge(e):
-        return
-    else:
-        adj_t = get_adjacent_triangle(p, e, all_triangles)
-        new_t1, new_t2 = flip_edges(Triangle(Edge(p, p1), Edge(p, p2), e), adj_t, e)
-        legalize_edge(p, new_t1.get_opposite_edge(p), all_triangles)
-        legalize_edge(p, new_t2.get_opposite_edge(p), all_triangles)
+    for t in triangle_list:
+        for p in t.get_points():
+            insert(p, after_traingulation_points)
+
 
 def make_out_file(out_path):
     """save output to file"""
     print(EDGE_FLIP_COUNTER)
     with open(out_path, 'w') as f:
         f.write(EDGE_FLIP_COUNTER)
-
-
-def run_delaunay_triangulation(triangle_list):
 
 
 if __name__ == '__main__':

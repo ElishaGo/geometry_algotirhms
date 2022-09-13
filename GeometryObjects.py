@@ -1,3 +1,6 @@
+from math import acos, degrees, sqrt
+
+
 class Point:
     def __init__(self, pid, px, py):
         self.pid = pid
@@ -46,6 +49,9 @@ class Edge:
     def have_common_points(self, e):
         return len(set(self.get_points_id()) & set(e.get_points_id())) > 0
 
+    def get_length(self):
+        return sqrt((self.p1.px - self.p2.px) ** 2 + abs(self.p1.py - self.p2.py) ** 2)
+
 
 class Triangle:
     def __init__(self, e1, e2, e3):
@@ -53,6 +59,15 @@ class Triangle:
         self.e2 = e2
         self.e3 = e3
         self.all_pid = set(e1.p1.pid, e1.p2.pid, e2.p1.pid, e2.p2.pid, e3.p1.pid, e3.p2.pid)
+        self.alpha = degrees(acos(
+            (self.e2.get_length() ** 2 + self.e3.get_length() ** 2 - self.e1.get_length() ** 2) / (
+                        2 * self.e2.get_length() * self.e3.get_length())))
+        self.beta = degrees(acos((self.e3.get_length() ** 2 + self.e1.get_length() ** 2 - self.e2.get_length() ** 2) / (
+                    2 * self.e3.get_length() * self.e1.get_length())))
+        self.gamma = degrees(acos(
+            (self.e1.get_length() ** 2 + self.e2.get_length() ** 2 - self.e3.get_length() ** 2) / (
+                        2 * self.e1.get_length() * self.e2.get_length())))
+
         e1.add_neighbor(e2)
         e1.add_neighbor(e3)
         e2.add_neighbor(e1)
@@ -80,3 +95,16 @@ class Triangle:
             return self.e2
         else:
             return self.e3
+
+    def get_area(self):
+        """calculate area of the triangle with Heron's formula"""
+        len_a, len_b, len_c = self.e1.get_length(), self.e2.get_length(), self.e3.get_length()
+        semi_perimeter = (len_a + len_b + len_c) / 2
+        area = sqrt(semi_perimeter * (semi_perimeter - len_a) * (semi_perimeter - len_b) * (semi_perimeter - len_c))
+        return area
+
+    def get_angles(self):
+        """alpha is angle opposite of e1
+        beta is angle oppsite of e2,
+        gamma is angle opposite of e3"""
+        return self.alpha, self.beta, self.gamma
